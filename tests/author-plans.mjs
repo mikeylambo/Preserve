@@ -1,6 +1,74 @@
-import {runPlan} from './plan-runner.js';import {writeFile} from 'node:fs/promises';import {verifyReplay} from '../src/replays.js';
-const R=(until,max=8)=>[{r:1},until,max],J=(until,max=8)=>[{r:1,j:1},until,max,1],D=()=>[{},'!pl.dead',2];
-const stairs=[R('pl.dead>0'),D(),R('pl.x>11.1'),J('pl.dead>0'),D(),R('pl.dead>0'),D(),R('pl.x>11.1'),J('pl.ground&&pl.y<14&&pl.x>12'),R('pl.x>18.5'),J('WON')];
-const spikeStairs=[R('pl.x>5.9'),J('pl.dead>0'),D(),R('pl.x>5.9'),J('pl.ground&&pl.x>8'),R('pl.x>11.1'),J('pl.dead>0'),D(),R('pl.x>5.9'),J('pl.ground&&pl.x>8'),R('pl.x>11.1'),J('pl.ground&&pl.y<14&&pl.x>14'),R('pl.x>16.1'),J('pl.dead>0'),D(),R('pl.x>5.9'),J('pl.ground&&pl.x>8'),R('pl.x>11.1'),J('pl.ground&&pl.y<14&&pl.x>14'),R('pl.x>16.1'),J('pl.ground&&pl.y<12&&pl.x>19'),R('pl.x>21.1'),J('WON')];
-const fields=[13,29,45,61,77];const chamber=[];function cross(start,death=false){chamber.push(R(`pl.x>${start-1.1}`),J(death?'pl.dead>0':`pl.ground&&pl.x>${start}`));if(!death)chamber.push(R(`pl.x>${start+4.9}`),J(`pl.ground&&pl.x>${start+7}`));}for(let k=0;k<fields.length;k++){for(let j=0;j<k;j++)cross(fields[j]);cross(fields[k],true);chamber.push(D());}for(const s of fields)cross(s);chamber.push(R('WON',10));
-const targets={'room.1.09':spikeStairs,'room.1.12':chamber,'room.2.06':stairs};for(const[id,plan]of Object.entries(targets)){const res=runPlan(id,plan);console.log(id,res.world.won,res.world.deaths,res.world.room.par);if(!res.world.won)console.log(res.log);else{const tape={version:'0.1.0',roomId:id,deaths:res.world.deaths,ticks:res.world.tick,inputs:res.runs};verifyReplay(tape);await writeFile('tests/solutions/'+id+'.json',JSON.stringify({tape},null,2));}}
+import { runPlan } from "./plan-runner.js";
+import { writeFile } from "node:fs/promises";
+import { verifyReplay } from "../src/replays.js";
+const R = (until, max = 8) => [{ r: 1 }, until, max],
+  J = (until, max = 8) => [{ r: 1, j: 1 }, until, max, 1],
+  D = () => [{}, "!pl.dead", 2];
+const stairs = [
+  R("pl.dead>0"),
+  D(),
+  R("pl.x>11.1"),
+  J("pl.dead>0"),
+  D(),
+  R("pl.dead>0"),
+  D(),
+  R("pl.x>11.1"),
+  J("pl.ground&&pl.y<14&&pl.x>12"),
+  R("pl.x>18.5"),
+  J("WON"),
+];
+const spikeStairs = [
+  R("pl.x>5.9"),
+  J("pl.dead>0"),
+  D(),
+  R("pl.x>5.9"),
+  J("pl.ground&&pl.x>8"),
+  R("pl.x>11.1"),
+  J("pl.dead>0"),
+  D(),
+  R("pl.x>5.9"),
+  J("pl.ground&&pl.x>8"),
+  R("pl.x>11.1"),
+  J("pl.ground&&pl.y<14&&pl.x>14"),
+  R("pl.x>16.1"),
+  J("pl.dead>0"),
+  D(),
+  R("pl.x>5.9"),
+  J("pl.ground&&pl.x>8"),
+  R("pl.x>11.1"),
+  J("pl.ground&&pl.y<14&&pl.x>14"),
+  R("pl.x>16.1"),
+  J("pl.ground&&pl.y<12&&pl.x>19"),
+  R("pl.x>21.1"),
+  J("WON"),
+];
+const fields = [13, 29, 45, 61, 77];
+const chamber = [];
+function cross(start, death = false) {
+  chamber.push(R(`pl.x>${start - 1.1}`), J(death ? "pl.dead>0" : `pl.ground&&pl.x>${start}`));
+  if (!death) chamber.push(R(`pl.x>${start + 4.9}`), J(`pl.ground&&pl.x>${start + 7}`));
+}
+for (let k = 0; k < fields.length; k++) {
+  for (let j = 0; j < k; j++) cross(fields[j]);
+  cross(fields[k], true);
+  chamber.push(D());
+}
+for (const s of fields) cross(s);
+chamber.push(R("WON", 10));
+const targets = { "room.1.09": spikeStairs, "room.1.12": chamber, "room.2.06": stairs };
+for (const [id, plan] of Object.entries(targets)) {
+  const res = runPlan(id, plan);
+  console.log(id, res.world.won, res.world.deaths, res.world.room.par);
+  if (!res.world.won) console.log(res.log);
+  else {
+    const tape = {
+      version: "0.1.0",
+      roomId: id,
+      deaths: res.world.deaths,
+      ticks: res.world.tick,
+      inputs: res.runs,
+    };
+    verifyReplay(tape);
+    await writeFile("tests/solutions/" + id + ".json", JSON.stringify({ tape }, null, 2));
+  }
+}

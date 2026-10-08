@@ -1,0 +1,7 @@
+vendor/
+docs/
+dist/
+Preserve.html
+tests/solutions/
+tests/*.json
+*.md

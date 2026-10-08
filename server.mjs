@@ -1,19 +1,150 @@
-import http from 'node:http';import {Worker} from 'node:worker_threads';
-import {readFile,writeFile,mkdir} from 'node:fs/promises';
-import {join,extname,resolve,dirname} from 'node:path';
-import {fileURLToPath} from 'node:url';
-import {verifyReplay} from './src/replays.js';
-import {MAIN_ROOMS} from './src/rooms.js';
-const root=dirname(fileURLToPath(import.meta.url));const dataDir=process.env.PRESERVE_DATA_DIR||join(root,'data');await mkdir(dataDir,{recursive:true});let boards={};try{boards=JSON.parse(await readFile(join(dataDir,'leaderboards.json'),'utf8'));}catch{}
-let writeQueue=Promise.resolve();const persist=()=>{writeQueue=writeQueue.then(()=>writeFile(join(dataDir,'leaderboards.json'),JSON.stringify(boards)));return writeQueue;};const limits=new Map();
-let jobs=0;function validate(data){if(jobs>=2)return Promise.reject(Error('Verification busy. Try again shortly.'));jobs++;return new Promise((resolve,reject)=>{const worker=new Worker(new URL('./server-worker.mjs',import.meta.url),{workerData:data});const timeout=setTimeout(()=>{worker.terminate();reject(Error('Replay validation timed out'));},30000);worker.once('message',r=>{clearTimeout(timeout);worker.terminate();r.ok?resolve(r):reject(Error(r.error));});worker.once('error',e=>{clearTimeout(timeout);reject(e);});}).finally(()=>jobs--);}
-const types={'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.json':'application/json'};
-const reply=(res,status,obj)=>{res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify(obj));};
-function submit(board,name,deaths,timeMs){const rows=boards[board]??=[];name=String(name??'Pip').trim().slice(0,24)||'Pip';rows.push({name,deaths,timeMs,date:new Date().toISOString()});rows.sort((a,b)=>a.deaths-b.deaths||a.timeMs-b.timeMs);boards[board]=rows.slice(0,100);}
-const server=http.createServer(async(req,res)=>{try{const url=new URL(req.url,'http://localhost');if(url.pathname.startsWith('/api/')){if(req.method==='GET'&&url.pathname==='/api/leaderboard'){reply(res,200,(boards[url.searchParams.get('room')]??[]).slice(0,20));return;}
- if(req.method!=='POST'){reply(res,404,{error:'Unknown endpoint'});return;}const ip=req.socket.remoteAddress;const previous=limits.get(ip)??0;if(Date.now()-previous<1000){reply(res,429,{error:'Wait a moment before submitting again.'});return;}limits.set(ip,Date.now());let body='';for await(const chunk of req){body+=chunk;if(body.length>5000000){reply(res,413,{error:'Replay too large'});return;}}const data=JSON.parse(body);
- if(url.pathname==='/api/leaderboard'){const valid=await validate({tape:data.tape});submit(data.tape.roomId,data.name,valid.deaths,valid.timeMs);await persist();reply(res,200,{verified:true,deaths:valid.deaths,timeMs:valid.timeMs});return;}
- if(url.pathname==='/api/run'){const valid=await validate({run:{id:data.id,tapes:data.tapes}});submit('run.'+data.id,data.name,valid.deaths,valid.timeMs);await persist();reply(res,200,{verified:true,deaths:valid.deaths,timeMs:valid.timeMs});return;}reply(res,404,{error:'Unknown endpoint'});return;}
- if(req.method!=='GET'&&req.method!=='HEAD'){res.writeHead(405);res.end();return;}const path=resolve(root,'.'+decodeURIComponent(url.pathname==='/'?'/index.html':url.pathname));if(!path.startsWith(root+'/')||path.includes('/data/')||path.includes('/tests/')||path.endsWith('server.mjs')){res.writeHead(403);res.end();return;}try{const bytes=await readFile(path);res.writeHead(200,{'Content-Type':types[extname(path)]??'application/octet-stream','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'});res.end(req.method==='HEAD'?undefined:bytes);}catch{res.writeHead(404);res.end('Not found');}
- }catch(e){reply(res,400,{error:e.message||'Invalid replay'});}});
-server.listen(Number(process.env.PORT||4173),process.env.PRESERVE_HOST||'0.0.0.0',()=>console.log(`Preserve: http://localhost:${server.address().port}`));
+import http from "node:http";
+import { Worker } from "node:worker_threads";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { join, extname, resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { verifyReplay } from "./src/replays.js";
+import { MAIN_ROOMS } from "./src/rooms.js";
+const root = dirname(fileURLToPath(import.meta.url));
+const dataDir = process.env.PRESERVE_DATA_DIR || join(root, "data");
+await mkdir(dataDir, { recursive: true });
+let boards = {};
+try {
+  boards = JSON.parse(await readFile(join(dataDir, "leaderboards.json"), "utf8"));
+} catch {}
+let writeQueue = Promise.resolve();
+const persist = () => {
+  writeQueue = writeQueue.then(() =>
+    writeFile(join(dataDir, "leaderboards.json"), JSON.stringify(boards)),
+  );
+  return writeQueue;
+};
+const limits = new Map();
+let jobs = 0;
+function validate(data) {
+  if (jobs >= 2) return Promise.reject(Error("Verification busy. Try again shortly."));
+  jobs++;
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL("./server-worker.mjs", import.meta.url), {
+      workerData: data,
+    });
+    const timeout = setTimeout(() => {
+      worker.terminate();
+      reject(Error("Replay validation timed out"));
+    }, 30000);
+    worker.once("message", (r) => {
+      clearTimeout(timeout);
+      worker.terminate();
+      r.ok ? resolve(r) : reject(Error(r.error));
+    });
+    worker.once("error", (e) => {
+      clearTimeout(timeout);
+      reject(e);
+    });
+  }).finally(() => jobs--);
+}
+const types = {
+  ".html": "text/html",
+  ".js": "text/javascript",
+  ".mjs": "text/javascript",
+  ".css": "text/css",
+  ".svg": "image/svg+xml",
+  ".json": "application/json",
+};
+const reply = (res, status, obj) => {
+  res.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+  res.end(JSON.stringify(obj));
+};
+function submit(board, name, deaths, timeMs) {
+  const rows = (boards[board] ??= []);
+  name =
+    String(name ?? "Pip")
+      .trim()
+      .slice(0, 24) || "Pip";
+  rows.push({ name, deaths, timeMs, date: new Date().toISOString() });
+  rows.sort((a, b) => a.deaths - b.deaths || a.timeMs - b.timeMs);
+  boards[board] = rows.slice(0, 100);
+}
+const server = http.createServer(async (req, res) => {
+  try {
+    const url = new URL(req.url, "http://localhost");
+    if (url.pathname.startsWith("/api/")) {
+      if (req.method === "GET" && url.pathname === "/api/leaderboard") {
+        reply(res, 200, (boards[url.searchParams.get("room")] ?? []).slice(0, 20));
+        return;
+      }
+      if (req.method !== "POST") {
+        reply(res, 404, { error: "Unknown endpoint" });
+        return;
+      }
+      const ip = req.socket.remoteAddress;
+      const previous = limits.get(ip) ?? 0;
+      if (Date.now() - previous < 1000) {
+        reply(res, 429, { error: "Wait a moment before submitting again." });
+        return;
+      }
+      limits.set(ip, Date.now());
+      let body = "";
+      for await (const chunk of req) {
+        body += chunk;
+        if (body.length > 5000000) {
+          reply(res, 413, { error: "Replay too large" });
+          return;
+        }
+      }
+      const data = JSON.parse(body);
+      if (url.pathname === "/api/leaderboard") {
+        const valid = await validate({ tape: data.tape });
+        submit(data.tape.roomId, data.name, valid.deaths, valid.timeMs);
+        await persist();
+        reply(res, 200, { verified: true, deaths: valid.deaths, timeMs: valid.timeMs });
+        return;
+      }
+      if (url.pathname === "/api/run") {
+        const valid = await validate({ run: { id: data.id, tapes: data.tapes } });
+        submit("run." + data.id, data.name, valid.deaths, valid.timeMs);
+        await persist();
+        reply(res, 200, { verified: true, deaths: valid.deaths, timeMs: valid.timeMs });
+        return;
+      }
+      reply(res, 404, { error: "Unknown endpoint" });
+      return;
+    }
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      res.writeHead(405);
+      res.end();
+      return;
+    }
+    const path = resolve(
+      root,
+      "." + decodeURIComponent(url.pathname === "/" ? "/index.html" : url.pathname),
+    );
+    if (
+      !path.startsWith(root + "/") ||
+      path.includes("/data/") ||
+      path.includes("/tests/") ||
+      path.endsWith("server.mjs")
+    ) {
+      res.writeHead(403);
+      res.end();
+      return;
+    }
+    try {
+      const bytes = await readFile(path);
+      res.writeHead(200, {
+        "Content-Type": types[extname(path)] ?? "application/octet-stream",
+        "Cache-Control": "no-cache",
+        "X-Content-Type-Options": "nosniff",
+      });
+      res.end(req.method === "HEAD" ? undefined : bytes);
+    } catch {
+      res.writeHead(404);
+      res.end("Not found");
+    }
+  } catch (e) {
+    reply(res, 400, { error: e.message || "Invalid replay" });
+  }
+});
+server.listen(Number(process.env.PORT || 4173), process.env.PRESERVE_HOST || "0.0.0.0", () =>
+  console.log(`Preserve: http://localhost:${server.address().port}`),
+);
