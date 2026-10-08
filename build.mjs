@@ -1,0 +1,9 @@
+import {mkdir,cp,readFile,writeFile,rm} from 'node:fs/promises';
+await rm('dist',{recursive:true,force:true});await mkdir('dist',{recursive:true});for(const path of ['src','vendor','index.html','style.css','favicon.svg'])await cp(path,'dist/'+path,{recursive:true});
+// A standalone offline HTML uses the same simulation and renderer modules.
+// Import maps with data URLs avoid a server and eliminate all network dependencies.
+const imports={};const moduleFiles=['src/art.js','src/cinematics.js','src/tuning.js','src/guides.js','src/rooms.js','src/simulation.js','src/replays.js','src/audio.js','src/renderer.js','vendor/three.module.js'];
+const {readdir}=await import('node:fs/promises');async function walk(path){for(const d of await readdir(path,{withFileTypes:true})){const p=path+'/'+d.name;if(d.isDirectory())await walk(p);else if(p.endsWith('.js'))moduleFiles.push(p);}}await walk('vendor/shell');
+const {posix}=await import('node:path');function transform(source,path){return source.replace(/(from\s*|import\s*)["'](\.[^"']+)["']/g,(_,prefix,rel)=>prefix+JSON.stringify('preserve:'+posix.normalize(posix.join(posix.dirname(path),rel))));}
+for(const p of moduleFiles){const source=transform(await readFile(p,'utf8'),p);imports['preserve:'+p]='data:text/javascript;base64,'+Buffer.from(source).toString('base64');}
+let html=await readFile('index.html','utf8');html=html.replace('<link rel="stylesheet" href="style.css">','<style>'+await readFile('style.css','utf8')+'</style>').replace('href="favicon.svg"','href="data:image/svg+xml,'+encodeURIComponent(await readFile('favicon.svg','utf8'))+'"');const main=transform(await readFile('src/main.js','utf8'),'src/main.js');html=html.replace('<script type="module" src="src/main.js"></script>','<script type="importmap">'+JSON.stringify({imports})+'</script><script type="module">'+main+'</script>');await writeFile('Preserve.html',html);console.log('Built dist/ and offline Preserve.html');
