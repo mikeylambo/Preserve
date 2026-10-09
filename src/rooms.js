@@ -1,3 +1,4 @@
+import { LAYOUTS } from "./layouts.js";
 export const ACTS = [
   { name: "Intake", color: 0x71828b },
   { name: "Impact", color: 0xd8382e },
@@ -953,6 +954,13 @@ for (let act = 1; act <= 7; act++) {
     y = a.length - 3;
   if (a[y][x] === ".") a[y][x] = "o";
   r.rows = a.map((r) => r.join(""));
+}
+// Re-authored full-screen layouts replace the alpha grids room by room.
+for (const r of out) {
+  const l = LAYOUTS[r.id];
+  if (!l) continue;
+  for (const k of Object.keys(r)) if (!["id", "act", "n", "name"].includes(k)) delete r[k];
+  Object.assign(r, l);
 }
 export const ROOMS = Object.freeze(out);
 export const MAIN_ROOMS = ROOMS.filter((r) => !r.anomaly);
