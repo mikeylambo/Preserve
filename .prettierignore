@@ -6,3 +6,4 @@ tests/solutions/
 tests/*.json
 *.md
 src/guides.js
+tests/par/
