@@ -258,7 +258,14 @@ export class DeathMaterials {
           const m = this.materialAt(cx, cy);
           let ny = cy;
           this.grid[cy][cx] = ".";
-          while (ny > 1 && !this.rect(cx, ny - 1)) {
+          // The block flies up until it hits a ceiling or catches under the lip of an
+          // overhang beside its path, where it stays as a ledge.
+          const lip = (sx) => !this.rect(sx, ny) && !!this.rect(sx, ny - 1);
+          while (
+            ny > 1 &&
+            !this.rect(cx, ny - 1) &&
+            (ny === cy || (!lip(cx - 1) && !lip(cx + 1)))
+          ) {
             ny--;
           }
           m.cells = [[cx, ny]];
