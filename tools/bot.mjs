@@ -349,6 +349,7 @@ export function prove(room, opts = {}) {
       inputs.push(...r.tape);
       w = r.world;
       held = r.held;
+      opts.onStep?.(i, w);
       continue;
     }
     const before = new Set(w.materials.map((m) => m.id));
@@ -365,6 +366,7 @@ export function prove(room, opts = {}) {
     w = r.world;
     held = r.held;
     inputs.push(...settle(w, held));
+    opts.onStep?.(i, w);
   }
   const deaths = w.deaths;
   const r = explore(w, {
