@@ -164,6 +164,58 @@ button:disabled {
   text-transform: uppercase;
   margin: 0 0 24px;
 }
+.jar-title svg {
+  display: block;
+  width: min(420px, 80vw, 62vh);
+  height: auto;
+  overflow: visible;
+}
+.jar-glass {
+  fill: rgba(207, 232, 228, 0.06);
+  stroke: rgba(233, 225, 211, 0.55);
+  stroke-width: 3;
+}
+.jar-lid {
+  fill: #b39355;
+  opacity: 0.85;
+}
+.jar-jelly {
+  fill: #2bc4a8;
+  opacity: 0.85;
+  filter: drop-shadow(0 0 14px #7ff0d8);
+  animation: jar-breathe 3.2s ease-in-out infinite;
+  transform-origin: 180px 286px;
+}
+.jar-eye {
+  fill: #1b2a26;
+}
+.jar-halo {
+  animation: jar-glow 3.2s ease-in-out infinite;
+}
+.jar-word {
+  font-family: inherit;
+  font-weight: 400;
+  font-size: 48px;
+  letter-spacing: -0.04em;
+  fill: #e9f7f2;
+  filter: drop-shadow(0 0 10px rgba(127, 240, 216, 0.7));
+}
+@keyframes jar-breathe {
+  50% {
+    transform: scaleY(1.06);
+  }
+}
+@keyframes jar-glow {
+  50% {
+    opacity: 0.7;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .jar-jelly,
+  .jar-halo {
+    animation: none;
+  }
+}
 .title-panel h1 {
   font-weight: 400;
   letter-spacing: -0.06em;
@@ -566,9 +618,19 @@ legend {
   }
 }
 @media (max-height: 500px) {
+  .title-panel {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 40px;
+    align-items: center;
+  }
+  .title-panel .small {
+    grid-column: 2;
+  }
   .title-panel h1 {
+    grid-row: span 2;
     font-size: 60px;
-    margin-bottom: 16px;
+    margin-bottom: 0;
   }
   .title-panel .small {
     margin-top: 16px;

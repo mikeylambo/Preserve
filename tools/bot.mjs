@@ -31,12 +31,15 @@ export function clone(w) {
 // Rooms whose behaviour depends on the clock need time in the state key.
 export function timed(room) {
   if (room.clockGrain) return room.clockGrain;
-  return 10 * !!(
-    room.machine ||
-    room.wind ||
-    room.sun ||
-    room.rows.some((r) => /[KL]/.test(r)) ||
-    room.rows.some((r) => r.includes("~") && r.includes("w"))
+  return (
+    10 *
+    !!(
+      room.machine ||
+      room.wind ||
+      room.sun ||
+      room.rows.some((r) => /[KL]/.test(r)) ||
+      room.rows.some((r) => r.includes("~") && r.includes("w"))
+    )
   );
 }
 
@@ -308,7 +311,13 @@ export function prove(room, opts = {}) {
         ticks++;
       }
       if (!past())
-        return { ok: false, step: i, target, deaths: w.deaths, grid: w.grid.map((g) => g.join("")) };
+        return {
+          ok: false,
+          step: i,
+          target,
+          deaths: w.deaths,
+          grid: w.grid.map((g) => g.join("")),
+        };
       continue;
     }
     if (target.via) {

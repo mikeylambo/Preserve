@@ -174,7 +174,7 @@ function bind(id, fn) {
 function title() {
   shell.session.setPhase("title");
   show(
-    `<div class="panel title-panel"><h1>Preserve</h1><div class="menu-list">${button("begin", save.progress.openingSeen ? "Continue" : "Begin", "primary")}${button("map", "Room select")}${button("settings", "Settings")}${button("scores", "Scorecard")}${save.progress.gameFinished ? button("runs", "Par Run") + button("homecoming", "Homecoming") : ""}</div><p class="small">${VERSION} · Mike Parker</p></div>`,
+    `<div class="panel title-panel"><h1 class="jar-title" aria-label="Preserve"><svg viewBox="0 0 360 300" aria-hidden="true"><defs><radialGradient id="jg" cx="50%" cy="85%" r="60%"><stop offset="0" stop-color="#7ff0d8" stop-opacity=".95"/><stop offset=".55" stop-color="#2bc4a8" stop-opacity=".55"/><stop offset="1" stop-color="#0e6b5c" stop-opacity="0"/></radialGradient><filter id="jb" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="9"/></filter></defs><ellipse class="jar-halo" cx="180" cy="230" rx="150" ry="70" fill="url(#jg)" filter="url(#jb)"/><rect x="92" y="22" width="176" height="30" rx="7" class="jar-lid"/><path class="jar-glass" d="M104 58h152c6 0 10 4 10 10v8c18 12 26 30 26 56v118c0 22-14 36-36 36H104c-22 0-36-14-36-36V132c0-26 8-44 26-56v-8c0-6 4-10 10-10Z"/><path class="jar-jelly" d="M74 236c30-16 64-20 106-20s76 4 106 20v14c0 22-14 36-36 36H110c-22 0-36-14-36-36Z"/><circle cx="160" cy="250" r="5" class="jar-eye"/><circle cx="200" cy="250" r="5" class="jar-eye"/><text x="180" y="168" text-anchor="middle" class="jar-word">Preserve</text></svg></h1><div class="menu-list">${button("begin", save.progress.openingSeen ? "Continue" : "Begin", "primary")}${button("map", "Room select")}${button("settings", "Settings")}${button("scores", "Scorecard")}${save.progress.gameFinished ? button("runs", "Par Run") + button("homecoming", "Homecoming") : ""}</div><p class="small">${VERSION} · Mike Parker</p></div>`,
     "title",
   );
   bind("begin", () =>
@@ -212,6 +212,9 @@ function opening() {
     play(MAIN_ROOMS[0].id);
   });
 }
+// Acts and rooms are marked, never named (no act or room name copy).
+const ACT_MARKS = ["0", "I", "II", "III", "IV", "V", "VI", "VII", "VIII"];
+const roomMark = (r) => `${ACT_MARKS[r.act]} · ${r.n === "A" ? "◇" : String(r.n).padStart(2, "0")}`;
 function actSeeds(act) {
   return Object.keys(save.progress.seeds).filter((id) => id.startsWith(`room.${act}.`)).length;
 }
@@ -224,15 +227,15 @@ function map() {
   for (let act = 8; act >= 0; act--) {
     const rooms = ROOMS.filter((r) => r.act === act);
     const seeds = act > 0 && act < 8 ? `<span class="small">${actSeeds(act)} / 3</span>` : "";
-    html += `<div class="sublevel"><div class="sublevel-name">${ACTS[act].name}<br>${seeds}</div><div class="room-grid">${rooms
+    html += `<div class="sublevel"><div class="sublevel-name">${seeds}</div><div class="room-grid">${rooms
       .map((r) => {
         const rec = save.rooms[r.id] ?? save.assistedRooms?.[r.id];
-        return `<button data-room="${r.id}" title="${r.name} · Par ${r.par}" aria-label="${r.name}, par ${r.par}${rec ? ", best " + rec.bestDeaths + " deaths" : ""}" class="room-window ${rec ? "cleared" : ""} ${rec && rec.bestDeaths <= r.par ? "pin" : ""} ${r.id === world.room.id ? "current" : ""}" ${!unlocked(r) ? "disabled" : ""}>${r.n === "A" ? "◇" : String(r.n).padStart(2, "0")}</button>`;
+        return `<button data-room="${r.id}" aria-label="${r.name}, par ${r.par}${rec ? ", best " + rec.bestDeaths + " deaths" : ""}" class="room-window ${rec ? "cleared" : ""} ${rec && rec.bestDeaths <= r.par ? "pin" : ""} ${r.id === world.room.id ? "current" : ""}" ${!unlocked(r) ? "disabled" : ""}>${r.n === "A" ? "◇" : String(r.n).padStart(2, "0")}</button>`;
       })
       .join("")}</div></div>`;
   }
   show(
-    `<div class="panel"><div class="toolbar"><h2>The climb</h2>${button("back", "Back", "quiet")}</div>${html}<div class="actions">${save.progress.gameFinished ? button("runs", "Par Run") : ""}${button("race", "Race a replay")}${button("scorecard", "Scorecard")}</div></div>`,
+    `<div class="panel"><div class="toolbar">${button("back", "Back", "quiet")}</div>${html}<div class="actions">${save.progress.gameFinished ? button("runs", "Par Run") : ""}${button("race", "Race a replay")}${button("scorecard", "Scorecard")}</div></div>`,
     "map",
   );
   screen.querySelectorAll("[data-room]").forEach((b) => (b.onclick = () => play(b.dataset.room)));
@@ -262,9 +265,6 @@ async function play(id, { keepRun = false } = {}) {
   show("", "play");
   shell.session.setPhase("playing");
   await shell.loadLevel(id, world);
-  $("#act-label").textContent = ACTS[world.room.act].name;
-  $("#room-label").textContent =
-    `${world.room.n === "A" ? "◇" : String(world.room.n).padStart(2, "0")} · ${world.room.name}`;
   $("#par").textContent = world.room.par;
   $("#help").textContent = HINTS[id] ?? "";
   $("#help").hidden = !HINTS[id];
@@ -390,7 +390,7 @@ function resultPanel(data, best) {
   const r = world.room;
   const name = golfName(data.score, r.par);
   show(
-    `<div class="tag"><p class="eyebrow">${r.name}</p><h2>${name}</h2><div class="results"><div><strong>${data.score} / ${r.par}</strong><small>Deaths / par</small></div><div><strong>${(data.timeMs / 1000).toFixed(2)} s</strong><small>${attemptAssisted ? "Guided clear" : best ? "Personal best" : "Room time"}</small></div></div><div class="actions">${button("next", parRun && parRun.index === parRun.ids.length ? "Finish run" : "Continue", "primary")}${button("again", "Retry")}${button("share", "Share replay")}</div><div class="actions">${button("board", "Leaderboard", "quiet")}${button("map", "Room select", "quiet")}</div></div>`,
+    `<div class="tag"><h2>${name}</h2><div class="results"><div><strong>${data.score} / ${r.par}</strong><small>Deaths / par</small></div><div><strong>${(data.timeMs / 1000).toFixed(2)} s</strong><small>${attemptAssisted ? "Guided clear" : best ? "Personal best" : "Room time"}</small></div></div><div class="actions">${button("next", parRun && parRun.index === parRun.ids.length ? "Finish run" : "Continue", "primary")}${button("again", "Retry")}${button("share", "Share replay")}</div><div class="actions">${button("board", "Leaderboard", "quiet")}${button("map", "Room select", "quiet")}</div></div>`,
     "result",
   );
   bind("next", nextRoom);
@@ -479,7 +479,7 @@ function scorecard() {
   const rows = ACTS.map((a, i) => {
     const rs = MAIN_ROOMS.filter((r) => r.act === i),
       cleared = rs.filter((r) => save.rooms[r.id]);
-    return `<tr><td>${a.name}</td><td>${cleared.length} / ${rs.length}</td><td>${cleared.reduce((s, r) => s + save.rooms[r.id].bestDeaths, 0)} / ${rs.reduce((s, r) => s + r.par, 0)}</td></tr>`;
+    return `<tr><td>${ACT_MARKS[ACTS.indexOf(a)]}</td><td>${cleared.length} / ${rs.length}</td><td>${cleared.reduce((s, r) => s + save.rooms[r.id].bestDeaths, 0)} / ${rs.reduce((s, r) => s + r.par, 0)}</td></tr>`;
   }).join("");
   show(
     `<div class="panel"><div class="toolbar"><h2>Scorecard</h2>${button("back", "Back", "quiet")}</div><table class="board"><thead><tr><th>Sublevel</th><th>Cleared</th><th>Deaths / par</th></tr></thead><tbody>${rows}</tbody></table><p class="small">${save.stats.totalDeaths} total deaths · ${(save.stats.playTimeMs / 60000).toFixed(1)} minutes</p></div>`,
@@ -626,7 +626,7 @@ function replayScreen(back, tape = null) {
 }
 function runMenu() {
   show(
-    `<div class="panel"><div class="toolbar"><h2>Par Run</h2>${button("back", "Back", "quiet")}</div><div class="menu-list">${ACTS.map((a, i) => button("run-" + i, a.name)).join("")}${button("run-all", "Full climb", "primary")}</div></div>`,
+    `<div class="panel"><div class="toolbar"><h2>Par Run</h2>${button("back", "Back", "quiet")}</div><div class="menu-list">${ACTS.map((a, i) => button("run-" + i, ACT_MARKS[i])).join("")}${button("run-all", "Full climb", "primary")}</div></div>`,
     "runs",
   );
   bind("back", map);
@@ -698,7 +698,7 @@ async function finishRun() {
     }
   });
 }
-async function leaderboard(back, boardId = world.room.id, boardTitle = world.room.name) {
+async function leaderboard(back, boardId = world.room.id, boardTitle = roomMark(world.room)) {
   show(
     `<div class="panel"><div class="toolbar"><h2>${boardTitle}</h2>${button("back", "Back", "quiet")}</div><table class="board"><thead><tr><th>Player</th><th>Deaths</th><th>Time</th></tr></thead><tbody id="board-rows"></tbody></table><p id="board-status" class="small">Local personal best</p><label class="settings-row">Name<input id="player-name" type="text" maxlength="24" value=""></label><div class="actions">${lastTape && !lastTape.assisted && boardId === world.room.id ? button("submit", "Submit verified replay", "primary") : ""}</div></div>`,
     "board",
