@@ -320,6 +320,22 @@ export function prove(room, opts = {}) {
         };
       continue;
     }
+    if (target.lift) {
+      // Stand still until this lift next arrives at its base (boarding is a
+      // single short hop, but finding the wait by search takes ages).
+      const [lx, ly] = target.lift;
+      const l = w.lifts.find((k) => k.x === lx && k.base === ly);
+      let ticks = 0,
+        away = false;
+      while (ticks < 240 * 30 && !(away && l.y === l.base)) {
+        away ||= l.y !== l.base;
+        inputs.push(...runMacro(w, 0, held, 1));
+        held = false;
+        ticks++;
+      }
+      opts.onStep?.(i, w);
+      continue;
+    }
     if (target.via) {
       const [vx, vy] = target.via;
       const deaths = w.deaths;
