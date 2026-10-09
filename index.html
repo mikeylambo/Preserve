@@ -1,7 +1,60 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#10191d"><title>Preserve</title><link rel="icon" href="favicon.svg"><link rel="stylesheet" href="style.css"></head><body>
-<canvas id="game" aria-label="Preserve game board"></canvas>
-<div id="hud" hidden><div class="room-meta"><button id="map-button" class="icon" aria-label="Sublevel map">▦</button><div><span id="act-label"></span><strong id="room-label"></strong></div></div><div class="scores"><span aria-label="Deaths"><svg viewBox="0 0 16 20"><path d="M8 1C7 4 1 9 1 13a7 7 0 0014 0C15 9 9 4 8 1Z"/></svg><b id="deaths">0</b></span><span aria-label="Par"><svg viewBox="0 0 20 20"><path d="M4 18V2l12 3-12 5M1 18h8" fill="none" stroke="currentColor" stroke-width="2"/></svg><b id="par">0</b></span><span id="seed-pips" aria-label="Sublevel seeds"></span><button class="icon" id="retry-button" aria-label="Retry room">↻</button><button class="icon" id="pause-button" aria-label="Pause">Ⅱ</button></div></div>
-<div id="help" hidden></div><div id="toast" role="status"></div>
-<div id="screen" class="screen"></div>
-<div id="touch" hidden><div class="move-pad"><button data-action="move.left" aria-label="Move left">◀</button><button data-action="move.right" aria-label="Move right">▶</button></div><div class="action-pad"><button data-action="swap" aria-label="Swap halves" class="swap">⇄</button><button data-action="jump" aria-label="Jump" class="jump">▲</button></div></div>
-<script type="module" src="src/main.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="theme-color" content="#10191d" />
+    <title>Preserve</title>
+    <link rel="icon" href="favicon.svg" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <canvas id="game" aria-label="Preserve game board"></canvas>
+    <div id="hud" hidden>
+      <div class="hud-left">
+        <button id="map-button" class="icon" aria-label="Sublevel map">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="4" y="3" width="16" height="18" rx="2" />
+            <path d="M8 7h3v3H8zM13 7h3v3h-3zM8 12h3v3H8zM13 12h3v3h-3z" class="fill" />
+          </svg></button
+        ><span id="room-mark" class="room-mark"></span>
+      </div>
+      <div class="hud-right">
+        <div class="score-tag">
+          <span class="stat" aria-label="Deaths"
+            ><svg viewBox="0 0 16 20" aria-hidden="true">
+              <path class="fill" d="M8 1C7 4 1 9 1 13a7 7 0 0014 0C15 9 9 4 8 1Z" /></svg
+            ><b id="deaths">0</b></span
+          ><span class="stat par" aria-label="Par"
+            ><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 18V2l11 3.5L5 9M2 18h7" /></svg
+            ><b id="par">0</b></span
+          ><span id="seed-pips" aria-label="Sublevel seeds"></span>
+        </div>
+        <button class="icon" id="retry-button" aria-label="Retry room">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M19 12a7 7 0 1 1-2.1-5" />
+            <path d="M17.5 2.5v4.5H13" />
+          </svg></button
+        ><button class="icon" id="pause-button" aria-label="Pause">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path class="fill" d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" />
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div id="help" hidden></div>
+    <div id="toast" role="status"></div>
+    <div id="screen" class="screen"></div>
+    <div id="touch" hidden>
+      <div class="move-pad">
+        <button data-action="move.left" aria-label="Move left">◀</button
+        ><button data-action="move.right" aria-label="Move right">▶</button>
+      </div>
+      <div class="action-pad">
+        <button data-action="swap" aria-label="Swap halves" class="swap">⇄</button
+        ><button data-action="jump" aria-label="Jump" class="jump">▲</button>
+      </div>
+    </div>
+    <script type="module" src="src/main.js"></script>
+  </body>
+</html>

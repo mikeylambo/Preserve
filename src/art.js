@@ -1,11 +1,139 @@
-import * as THREE from '../vendor/three.module.js';
+import * as THREE from "../vendor/three.module.js";
 // Original deterministic painted surfaces. Generated once, shared across rooms.
-export function paintTexture(kind){const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');let seed=kind.length*317;const rand=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};g.fillStyle=kind==='wood'?'#896747':kind==='cloth'?'#ddd6b9':'#62676b';g.fillRect(0,0,256,256);
-if(kind==='wood'){for(let y=0;y<256;y++){g.strokeStyle=`rgba(${rand()>.5?'39,24,16':'218,177,123'},${.02+rand()*.12})`;g.beginPath();g.moveTo(0,y);for(let x=0;x<=256;x+=8)g.lineTo(x,y+Math.sin(x*.03+y*.14)*2);g.stroke();}for(let k=0;k<4;k++){g.strokeStyle='#35261c55';g.beginPath();g.ellipse(rand()*256,rand()*256,18,3,0,0,Math.PI*2);g.stroke();}}
-else if(kind==='cloth'){for(let i=0;i<256;i+=4){g.fillStyle='#75694b16';g.fillRect(i,0,1,256);g.fillRect(0,i,256,1);}g.fillStyle='#ae937222';for(let y=0;y<256;y+=32)for(let x=0;x<256;x+=32)if((x+y)%64===0)g.fillRect(x,y,32,32);}
-else{for(let i=0;i<7500;i++){const a=rand()*.16;g.fillStyle=rand()>.55?`rgba(223,224,212,${a})`:`rgba(12,18,22,${a})`;g.fillRect(rand()*256,rand()*256,rand()*2+1,rand()*2+1);}for(let i=0;i<24;i++){g.strokeStyle='#11192318';g.beginPath();let x=rand()*256,y=rand()*256;g.moveTo(x,y);for(let j=0;j<6;j++){x+=rand()*13-4;y+=rand()*9;g.lineTo(x,y);}g.stroke();}}
-const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;}
-export function storyTexture(kind){const c=document.createElement('canvas');c.width=512;c.height=384;const g=c.getContext('2d');g.fillStyle='#e4d9b8';g.fillRect(0,0,512,384);
-if(kind==='label'){g.strokeStyle='#7e6847';g.lineWidth=5;g.beginPath();g.moveTo(50,45);g.bezierCurveTo(170,35,330,51,458,38);g.stroke();g.fillStyle='#9b6952';g.beginPath();g.ellipse(254,182,72,65,-.2,0,Math.PI*2);g.fill();g.strokeStyle='#655c3f';g.lineWidth=10;g.beginPath();g.moveTo(256,130);g.quadraticCurveTo(265,79,306,78);g.stroke();g.fillStyle='#79805b';g.beginPath();g.ellipse(303,104,29,12,-.4,0,Math.PI*2);g.fill();g.strokeStyle='#846b4e';g.lineWidth=3;for(let i=0;i<8;i++){g.beginPath();g.moveTo(195+i*18,293);g.lineTo(200+i*18,310+(i%3)*4);g.stroke();}}
-else{const sky=g.createLinearGradient(0,0,0,384);sky.addColorStop(0,'#a7b7b8');sky.addColorStop(.55,'#e8d3a0');sky.addColorStop(1,'#746e4f');g.fillStyle=sky;g.fillRect(18,18,476,348);g.fillStyle='#8b7858';g.fillRect(285,131,139,134);g.fillStyle='#4f5148';g.beginPath();g.moveTo(270,137);g.lineTo(352,76);g.lineTo(439,137);g.fill();g.fillStyle='#f3deb0';g.fillRect(310,156,31,39);g.fillRect(362,156,31,39);g.fillStyle='#513c2c';g.fillRect(343,209,30,56);g.fillStyle='#987250';g.fillRect(18,277,476,89);g.fillStyle='#eee3c5';g.fillRect(70,256,200,36);g.strokeStyle='#506d60';g.lineWidth=4;g.strokeRect(138,197,61,74);g.fillStyle='#538b75';g.fillRect(142,229,53,37);g.fillStyle='#a98a56';g.fillRect(132,188,73,12);g.fillStyle='#dfd2aa';g.fillRect(151,234,36,22);g.fillStyle='#9a6c4c';g.beginPath();g.arc(169,244,7,0,Math.PI*2);g.fill();}
-const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;}
+export function paintTexture(kind) {
+  const c = document.createElement("canvas");
+  c.width = c.height = 256;
+  const g = c.getContext("2d");
+  let seed = kind.length * 317;
+  const rand = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+  g.fillStyle = kind === "wood" ? "#896747" : kind === "cloth" ? "#ddd6b9" : "#62676b";
+  g.fillRect(0, 0, 256, 256);
+  if (kind === "wood") {
+    for (let y = 0; y < 256; y++) {
+      g.strokeStyle = `rgba(${rand() > 0.5 ? "39,24,16" : "218,177,123"},${0.02 + rand() * 0.12})`;
+      g.beginPath();
+      g.moveTo(0, y);
+      for (let x = 0; x <= 256; x += 8) g.lineTo(x, y + Math.sin(x * 0.03 + y * 0.14) * 2);
+      g.stroke();
+    }
+    for (let k = 0; k < 4; k++) {
+      g.strokeStyle = "#35261c55";
+      g.beginPath();
+      g.ellipse(rand() * 256, rand() * 256, 18, 3, 0, 0, Math.PI * 2);
+      g.stroke();
+    }
+  } else if (kind === "cloth") {
+    for (let i = 0; i < 256; i += 4) {
+      g.fillStyle = "#75694b16";
+      g.fillRect(i, 0, 1, 256);
+      g.fillRect(0, i, 256, 1);
+    }
+    g.fillStyle = "#ae937222";
+    for (let y = 0; y < 256; y += 32)
+      for (let x = 0; x < 256; x += 32) if ((x + y) % 64 === 0) g.fillRect(x, y, 32, 32);
+  } else {
+    for (let i = 0; i < 7500; i++) {
+      const a = rand() * 0.16;
+      g.fillStyle = rand() > 0.55 ? `rgba(223,224,212,${a})` : `rgba(12,18,22,${a})`;
+      g.fillRect(rand() * 256, rand() * 256, rand() * 2 + 1, rand() * 2 + 1);
+    }
+    for (let i = 0; i < 24; i++) {
+      g.strokeStyle = "#11192318";
+      g.beginPath();
+      let x = rand() * 256,
+        y = rand() * 256;
+      g.moveTo(x, y);
+      for (let j = 0; j < 6; j++) {
+        x += rand() * 13 - 4;
+        y += rand() * 9;
+        g.lineTo(x, y);
+      }
+      g.stroke();
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+export function storyTexture(kind) {
+  const c = document.createElement("canvas");
+  c.width = 512;
+  c.height = 384;
+  const g = c.getContext("2d");
+  g.fillStyle = "#e4d9b8";
+  g.fillRect(0, 0, 512, 384);
+  if (kind === "label") {
+    g.strokeStyle = "#7e6847";
+    g.lineWidth = 5;
+    g.beginPath();
+    g.moveTo(50, 45);
+    g.bezierCurveTo(170, 35, 330, 51, 458, 38);
+    g.stroke();
+    g.fillStyle = "#9b6952";
+    g.beginPath();
+    g.ellipse(254, 182, 72, 65, -0.2, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = "#655c3f";
+    g.lineWidth = 10;
+    g.beginPath();
+    g.moveTo(256, 130);
+    g.quadraticCurveTo(265, 79, 306, 78);
+    g.stroke();
+    g.fillStyle = "#79805b";
+    g.beginPath();
+    g.ellipse(303, 104, 29, 12, -0.4, 0, Math.PI * 2);
+    g.fill();
+    g.strokeStyle = "#846b4e";
+    g.lineWidth = 3;
+    for (let i = 0; i < 8; i++) {
+      g.beginPath();
+      g.moveTo(195 + i * 18, 293);
+      g.lineTo(200 + i * 18, 310 + (i % 3) * 4);
+      g.stroke();
+    }
+  } else {
+    const sky = g.createLinearGradient(0, 0, 0, 384);
+    sky.addColorStop(0, "#a7b7b8");
+    sky.addColorStop(0.55, "#e8d3a0");
+    sky.addColorStop(1, "#746e4f");
+    g.fillStyle = sky;
+    g.fillRect(18, 18, 476, 348);
+    g.fillStyle = "#8b7858";
+    g.fillRect(285, 131, 139, 134);
+    g.fillStyle = "#4f5148";
+    g.beginPath();
+    g.moveTo(270, 137);
+    g.lineTo(352, 76);
+    g.lineTo(439, 137);
+    g.fill();
+    g.fillStyle = "#f3deb0";
+    g.fillRect(310, 156, 31, 39);
+    g.fillRect(362, 156, 31, 39);
+    g.fillStyle = "#513c2c";
+    g.fillRect(343, 209, 30, 56);
+    g.fillStyle = "#987250";
+    g.fillRect(18, 277, 476, 89);
+    g.fillStyle = "#eee3c5";
+    g.fillRect(70, 256, 200, 36);
+    g.strokeStyle = "#506d60";
+    g.lineWidth = 4;
+    g.strokeRect(138, 197, 61, 74);
+    g.fillStyle = "#538b75";
+    g.fillRect(142, 229, 53, 37);
+    g.fillStyle = "#a98a56";
+    g.fillRect(132, 188, 73, 12);
+    g.fillStyle = "#dfd2aa";
+    g.fillRect(151, 234, 36, 22);
+    g.fillStyle = "#9a6c4c";
+    g.beginPath();
+    g.arc(169, 244, 7, 0, Math.PI * 2);
+    g.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
