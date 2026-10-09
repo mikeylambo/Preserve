@@ -22,7 +22,7 @@ export const TUNE = Object.freeze({
   iceMelt: 1.5,
   short: 1,
 });
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";
 export function golfName(deaths, par) {
   if (deaths === 0 && par > 0) return "Ace";
   const d = deaths - par;

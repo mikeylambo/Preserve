@@ -76,6 +76,14 @@ save.progress = {
   openingSeen: false,
   ...loaded?.progress,
 };
+// 0.2.0 re-authored every room: scores, ghosts and seed spots from earlier
+// layouts no longer describe the same rooms, so they reset. How far you got stays.
+if (loaded && loaded.layouts !== 2) {
+  save.rooms = {};
+  save.parRuns = {};
+  save.progress.seeds = {};
+}
+save.layouts = 2;
 const settings = save.settings,
   audio = new AudioLayer(settings);
 let renderer;
