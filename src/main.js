@@ -229,24 +229,47 @@ function actSeeds(act) {
 function unlocked(r) {
   return r.anomaly ? actSeeds(r.act) >= 3 : MAIN_ROOMS.indexOf(r) <= save.progress.reachedRoom;
 }
+const cssHex = (c) => "#" + c.toString(16).padStart(6, "0");
+// The sublevel map is a cross-section of the facility (art bible §8): floors
+// stacked as you climb, a lift shaft through them, rooms as small windows that
+// light up once reached and glow teal once cleared.
 function map() {
   shell.session.setPhase("menu");
-  let html = "";
+  const here = world.room.act;
+  let floors = "";
   for (let act = 8; act >= 0; act--) {
     const rooms = ROOMS.filter((r) => r.act === act);
-    const seeds = act > 0 && act < 8 ? `<span class="small">${actSeeds(act)} / 3</span>` : "";
-    html += `<div class="sublevel"><div class="sublevel-name">${seeds}</div><div class="room-grid">${rooms
+    const reached = rooms.some((r) => !r.anomaly && unlocked(r));
+    const seeds =
+      act > 0 && act < 8
+        ? `<span class="floor-seeds" aria-label="${actSeeds(act)} of 3 seeds">${[0, 1, 2].map((i) => SEED_SVG(i < actSeeds(act))).join("")}</span>`
+        : "";
+    const windows = rooms
       .map((r) => {
         const rec = save.rooms[r.id] ?? save.assistedRooms?.[r.id];
-        return `<button data-room="${r.id}" aria-label="${r.name}, par ${r.par}${rec ? ", best " + rec.bestDeaths + " deaths" : ""}" class="room-window ${rec ? "cleared" : ""} ${rec && rec.bestDeaths <= r.par ? "pin" : ""} ${r.id === world.room.id ? "current" : ""}" ${!unlocked(r) ? "disabled" : ""}>${r.n === "A" ? "◇" : String(r.n).padStart(2, "0")}</button>`;
+        const open = unlocked(r);
+        const cls = [
+          "room-window",
+          r.anomaly ? "anomaly" : "",
+          open ? "lit" : "locked",
+          rec ? "cleared" : "",
+          rec && rec.bestDeaths <= r.par ? "pin" : "",
+          r.id === world.room.id ? "current" : "",
+        ].join(" ");
+        const label = `${r.name}, par ${r.par}${rec ? ", best " + rec.bestDeaths + " deaths" : ""}${open ? "" : ", locked"}`;
+        const mark = r.anomaly ? "◇" : String(r.n).padStart(2, "0");
+        return `<button data-room="${r.id}" aria-label="${label}" class="${cls}" ${open ? "" : "disabled"}><span>${open ? mark : ""}</span>${rec ? `<small>${rec.bestDeaths}/${r.par}</small>` : ""}</button>`;
       })
-      .join("")}</div></div>`;
+      .join("");
+    floors += `<section class="floor ${reached ? "reached" : "dark"} ${act === here ? "here" : ""}" style="--act:${cssHex(ACTS[act].color)}"><div class="shaft"><span class="act-num">${ACT_MARKS[act]}</span>${act === here ? '<span class="car" aria-label="You are here"></span>' : ""}</div><div class="floor-body"><div class="floor-head"><span class="act-name">${reached ? ACTS[act].name : "·  ·  ·"}</span>${seeds}</div><div class="room-grid">${windows}</div></div></section>`;
   }
   show(
-    `<div class="panel"><div class="toolbar">${button("back", "Back", "quiet")}</div>${html}<div class="actions">${save.progress.gameFinished ? button("runs", "Par Run") : ""}${button("race", "Race a replay")}${button("scorecard", "Scorecard")}</div></div>`,
+    `<div class="panel map-panel"><div class="toolbar"><h2>The climb</h2>${button("back", "Back", "quiet")}</div><div class="facility">${floors}</div><div class="actions">${save.progress.gameFinished ? button("runs", "Par Run") : ""}${button("race", "Race a replay")}${button("scorecard", "Scorecard")}</div></div>`,
     "map",
   );
   screen.querySelectorAll("[data-room]").forEach((b) => (b.onclick = () => play(b.dataset.room)));
+  screen.querySelector(".floor.here")?.scrollIntoView({ block: "center" });
+  screen.querySelector(".room-window.current")?.focus({ preventScroll: true });
   bind("back", title);
   bind("runs", runMenu);
   bind("race", () => replayScreen(map));
@@ -274,6 +297,8 @@ async function play(id, { keepRun = false } = {}) {
   shell.session.setPhase("playing");
   await shell.loadLevel(id, world);
   $("#par").textContent = world.room.par;
+  $("#deaths").textContent = "0";
+  $("#room-mark").textContent = roomMark(world.room);
   $("#help").textContent = HINTS[id] ?? "";
   $("#help").hidden = !HINTS[id];
   setTimeout(() => {
@@ -296,13 +321,27 @@ async function play(id, { keepRun = false } = {}) {
   }
   updateHud();
 }
+const SEED_SVG = (found) =>
+  `<svg viewBox="0 0 10 14" class="seed ${found ? "found" : ""}" aria-hidden="true"><path d="M5 1C8.6 4.2 8.6 9.8 5 13C1.4 9.8 1.4 4.2 5 1Z"/></svg>`;
 function updateHud() {
-  $("#deaths").textContent = world.deaths;
-  $("#seed-pips").textContent =
-    world.room.act > 0 && world.room.act < 8
-      ? "●".repeat(Math.min(3, actSeeds(world.room.act))) +
-        "○".repeat(Math.max(0, 3 - actSeeds(world.room.act)))
-      : "";
+  const deaths = $("#deaths");
+  if (deaths.textContent !== String(world.deaths)) {
+    deaths.textContent = world.deaths;
+    // A small bump each time a death is spent.
+    deaths.parentElement.classList.remove("bump");
+    void deaths.offsetWidth;
+    deaths.parentElement.classList.add("bump");
+  }
+  // Wordless pace: the drop warms once the room goes over par.
+  deaths.parentElement.classList.toggle("over", world.deaths > world.room.par);
+  const act = world.room.act;
+  const found = act > 0 && act < 8 ? Math.min(3, actSeeds(act)) : -1;
+  const pips = $("#seed-pips");
+  if (pips.dataset.found !== String(found)) {
+    pips.dataset.found = found;
+    pips.innerHTML = found < 0 ? "" : [0, 1, 2].map((i) => SEED_SVG(i < found)).join("");
+    pips.hidden = found < 0;
+  }
   document.querySelector("[data-action=swap]").style.visibility =
     world.players.length > 1 ? "visible" : "hidden";
 }
@@ -316,7 +355,7 @@ function pause() {
     persist();
     shell.pause();
     show(
-      `<div class="panel"><h2>Paused</h2><div class="menu-list">${button("resume", "Resume", "primary")}${button("retry", "Retry")}${button("room-map", "Room select")}${button("settings", "Settings")}${button("title", "Title")}</div></div>`,
+      `<div class="card pause-card"><p class="eyebrow">${roomMark(world.room)}</p><h2>Paused</h2><div class="pause-score"><span class="stat ${world.deaths > world.room.par ? "over" : ""}"><svg viewBox="0 0 16 20"><path class="fill" d="M8 1C7 4 1 9 1 13a7 7 0 0014 0C15 9 9 4 8 1Z"/></svg><b>${world.deaths}</b></span><span class="stat par"><svg viewBox="0 0 20 20"><path d="M5 18V2l11 3.5L5 9M2 18h7"/></svg><b>${world.room.par}</b></span></div><div class="menu-list">${button("resume", "Resume", "primary")}${button("retry", "Retry")}${button("room-map", "Room select")}${button("settings", "Settings")}${button("title", "Title")}</div></div>`,
       "pause",
     );
     bind("resume", resume);
@@ -497,7 +536,7 @@ function scorecard() {
 }
 function settingsScreen(back) {
   show(
-    `<div class="panel"><div class="toolbar"><h2>Settings</h2>${button("back", "Back", "quiet")}</div><fieldset><legend>Video</legend>${["pip", "world"].map((k) => `<label class="settings-row">${k === "pip" ? "Pip" : "World"} quality<select data-setting="${k}">${["low", "medium", "high"].map((v) => `<option ${settings[k] === v ? "selected" : ""}>${v}</option>`).join("")}</select></label>`).join("")}${["motion", "outlines", "ghost", "guide"].map((k) => `<label class="settings-row">${{ motion: "Motion effects", outlines: "Material outlines", ghost: "Personal best ghost", guide: "Guide ghost" }[k]}<input type="checkbox" data-setting="${k}" ${settings[k] ? "checked" : ""}></label>`).join("")}</fieldset><p class="small">Guide ghosts are available in some rooms. Guided scores stay separate.</p><fieldset><legend>Audio</legend>${["music", "sfx", "ambience", "ui"].map((k) => `<label class="settings-row">${{ music: "Music", sfx: "Sound effects", ambience: "Ambience", ui: "Menus" }[k]}<input data-setting="${k}" type="range" min="0" max="1" step=".05" value="${settings[k]}"></label>`).join("")}</fieldset><fieldset><legend>Controls</legend>${Object.entries(
+    `<div class="panel"><div class="toolbar"><h2>Settings</h2>${button("back", "Back", "quiet")}</div><fieldset><legend>Video</legend>${["pip", "world"].map((k) => `<label class="settings-row">${k === "pip" ? "Pip" : "World"} quality<select data-setting="${k}">${["low", "medium", "high"].map((v) => `<option value="${v}" ${settings[k] === v ? "selected" : ""}>${v[0].toUpperCase() + v.slice(1)}</option>`).join("")}</select></label>`).join("")}${["motion", "outlines", "ghost", "guide"].map((k) => `<label class="settings-row">${{ motion: "Motion effects", outlines: "Material outlines", ghost: "Personal best ghost", guide: "Guide ghost" }[k]}<input type="checkbox" data-setting="${k}" ${settings[k] ? "checked" : ""}></label>`).join("")}</fieldset><p class="small">Guide ghosts are available in some rooms. Guided scores stay separate.</p><fieldset><legend>Audio</legend>${["music", "sfx", "ambience", "ui"].map((k) => `<label class="settings-row">${{ music: "Music", sfx: "Sound effects", ambience: "Ambience", ui: "Menus" }[k]}<input data-setting="${k}" type="range" min="0" max="1" step=".05" value="${settings[k]}"></label>`).join("")}</fieldset><fieldset><legend>Controls</legend>${Object.entries(
       keyboard,
     )
       .map(

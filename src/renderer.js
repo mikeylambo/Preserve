@@ -187,6 +187,27 @@ export class PreserveRenderer {
     this.key.shadow.bias = -0.0006;
     this.key.shadow.normalBias = 0.02;
     this.scene.add(this.hemi, this.key, this.key.target);
+    // The prototype's emergency searchlights (acts 1 and 2): red spots that sweep
+    // the room, each with a faint visible cone. Always in the scene so switching
+    // rooms never recompiles shaders; idle ones sit at zero.
+    this.searchlights = [0, 1, 2].map(() => {
+      const light = new THREE.SpotLight(0xd8382e, 0, 0, 0.24, 0.7, 1.2);
+      const cone = new THREE.Mesh(
+        new THREE.ConeGeometry(1, 1, 32, 1, true).translate(0, -0.5, 0),
+        new THREE.MeshBasicMaterial({
+          color: 0xd8382e,
+          transparent: true,
+          opacity: 0.022,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          fog: false,
+        }),
+      );
+      cone.visible = false;
+      this.scene.add(light, light.target, cone);
+      return { light, cone };
+    });
     this.pipLight = new THREE.PointLight(GLOW, 6, 7, 1.6);
     this.scene.add(this.pipLight);
     this.createGel();
@@ -474,6 +495,13 @@ export class PreserveRenderer {
     sc.near = 1;
     sc.far = 90;
     sc.updateProjectionMatrix();
+    const spots = L.beacons ? Math.max(1, Math.round(world.w / 22)) : 0;
+    this.searchlights.forEach((sl, i) => {
+      sl.active = i < spots;
+      sl.span = world.w / Math.max(1, spots);
+      sl.light.intensity = 0;
+      sl.cone.visible = false;
+    });
     this.applyTier();
     this.buildBackdrop(world);
     this.buildKit(world);
@@ -1502,6 +1530,28 @@ export class PreserveRenderer {
     let keyI = L.keyIntensity;
     for (const [i, b] of (this.beacons ?? []).entries()) b.rotation.z = this.clock * 2.4 + i;
     if (L.beacons) keyI *= 0.75 + 0.25 * Math.max(0, Math.sin(this.clock * 2.4));
+    for (const [i, sl] of this.searchlights.entries()) {
+      if (!sl.active) continue;
+      // Each light hangs above its third of the room and sweeps it slowly.
+      const cx = sl.span * (i + 0.5);
+      const sweep = Math.sin(this.clock * 0.55 + i * 2.1);
+      const from = new THREE.Vector3(cx - sweep * 2, 3, 9);
+      const to = new THREE.Vector3(
+        cx + sweep * (sl.span / 2 - 1.5),
+        -w.h + 2 + (0.5 + 0.5 * Math.sin(this.clock * 0.9 + i)) * 4,
+        0,
+      );
+      sl.light.position.copy(from);
+      sl.light.target.position.copy(to);
+      sl.light.intensity = 300;
+      sl.light.castShadow = this.settings.world === "high";
+      const dir = to.clone().sub(from);
+      const len = dir.length();
+      sl.cone.visible = this.settings.world !== "low";
+      sl.cone.position.copy(from);
+      sl.cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir.normalize());
+      sl.cone.scale.set(len * Math.tan(0.2), len, len * Math.tan(0.2));
+    }
     if (L.flicker) {
       const f = hash(Math.floor(this.clock * 12), 7) > 0.93 ? 0.35 : 1;
       if (this.lamps?.[1]) this.lamps[1].visible = f > 0.5;
