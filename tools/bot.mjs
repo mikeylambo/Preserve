@@ -30,7 +30,8 @@ export function clone(w) {
 
 // Rooms whose behaviour depends on the clock need time in the state key.
 export function timed(room) {
-  return !!(
+  if (room.clockGrain) return room.clockGrain;
+  return 10 * !!(
     room.machine ||
     room.wind ||
     room.sun ||
@@ -81,7 +82,7 @@ function stateKey(w, held, clock, grain = 4) {
   for (const k of w.presses) s += k.jammed ? `|j${q(k.top, 2)}` : "|k";
   for (const k of w.presses) if (!k.jammed) s += `|${k.phase},${q(k.pos, 2)},${q(k.t, 4)}`;
   for (const l of w.lifts) s += `|${q(l.y, 4)}`;
-  if (clock) s += `|t${q(w.time, 10)}`;
+  if (clock) s += `|t${q(w.time, clock)}`;
   return s;
 }
 
@@ -185,13 +186,16 @@ export function explore(
   while (open.size) {
     const n = open.pop();
     const split = n.w.players.filter((p) => !p.dead).length > 1;
-    const moves = split ? [...MOVES, 16] : MOVES;
+    let moves = split ? [...MOVES, 16] : MOVES;
+    // On a clock, standing still for a while is a move of its own, so waiting
+    // for a lift or a gust costs a few nodes instead of a deep chain of idles.
+    if (clock && n.w.players.some((p) => !p.dead && p.ground)) moves = [...moves, 32];
     for (const mask of moves) {
       if (++nodes > maxNodes) return null;
       const w = clone(n.w);
       const deaths = w.deaths;
-      const tape = runMacro(w, mask, n.held, mask & 16 ? 1 : ticks);
-      const node = { w, held: !!(mask & 4), parent: n, tape, g: n.g + 1 };
+      const tape = runMacro(w, mask, n.held, mask & 16 ? 1 : mask & 32 ? ticks * 8 : ticks);
+      const node = { w, held: !!(mask & 4), parent: n, tape, g: n.g + (mask & 32 ? 0.25 : 1) };
       if (goal(w)) {
         stats.nodes = nodes;
         return { world: w, tape: path(node), held: node.held };
@@ -289,6 +293,24 @@ export function prove(room, opts = {}) {
   const plan = room.solution ?? [];
   for (let i = 0; i < plan.length; i++) {
     const target = plan[i];
+    if (target.hold !== undefined) {
+      // A scripted stretch: hold these inputs until the active body's centre
+      // passes column `until` (a run-up the search would take ages to find).
+      const deaths = w.deaths;
+      let ticks = 0;
+      const past = () => {
+        const p = w.players[w.active];
+        return !p.dead && p.ground && p.x + p.w / 2 >= target.until;
+      };
+      while (!past() && ticks < 4800 && w.deaths === deaths) {
+        inputs.push(...runMacro(w, target.hold, held, 1));
+        held = !!(target.hold & 4);
+        ticks++;
+      }
+      if (!past())
+        return { ok: false, step: i, target, deaths: w.deaths, grid: w.grid.map((g) => g.join("")) };
+      continue;
+    }
     if (target.via) {
       const [vx, vy] = target.via;
       const deaths = w.deaths;
@@ -357,32 +379,40 @@ export function prove(room, opts = {}) {
 }
 
 // Fewest deaths to clear, searching every distinct death outcome level by level.
-export function minimum(room, limit, { maxNodes = 120000, maxStates = 4000, ticks = 12 } = {}) {
-  let level = [{ w: new DeathMaterials(room), held: false }];
+// With `tape: true` it also returns the verified input tape of that clear.
+export function minimum(
+  room,
+  limit,
+  { maxNodes = 120000, maxStates = 4000, ticks = 12, tape = false } = {},
+) {
+  let level = [{ w: new DeathMaterials(room), held: false, prefix: [] }];
   const seen = new Set();
   let exhaustive = true;
   for (let d = 0; d <= limit; d++) {
     const next = [];
     for (const s of level) {
-      let cleared = false;
       const r = explore(s.w, {
         ticks,
         maxNodes,
         prevHeld: s.held,
         goal: (x) => x.won,
-        onDeath: (x, _path, held) => {
+        onDeath: (x, path, held) => {
           if (d === limit) return false;
           const y = clone(x);
-          settle(y, held);
+          const rest = settle(y, held);
           const k = gridKey(y) + (timed(room) ? `|t${q(y.time, 4)}` : "") + "|" + y.players.length;
           if (seen.has(k)) return false;
           seen.add(k);
-          next.push({ w: y, held });
+          next.push({ w: y, held, prefix: tape ? [...s.prefix, ...path(), ...rest] : [] });
           return false;
         },
       });
-      if (r) cleared = true;
-      if (cleared) return { deaths: d, exhaustive };
+      if (r) {
+        if (!tape) return { deaths: d, exhaustive };
+        const t = tapeOf(room, r.world, [...s.prefix, ...r.tape]);
+        verifyReplay(t);
+        return { deaths: d, exhaustive, tape: t };
+      }
     }
     if (next.length > maxStates) {
       exhaustive = false;

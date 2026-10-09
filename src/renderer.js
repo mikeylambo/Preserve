@@ -734,7 +734,7 @@ export class PreserveRenderer {
       this.box(
         this.pressGroup,
         w.w / 2,
-        Math.min(12, Math.floor(w.time / 8)) + 0.5,
+        w.plateRow() + 0.5,
         0,
         w.w - 2,
         1,

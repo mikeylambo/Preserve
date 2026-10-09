@@ -5,3 +5,4 @@ Preserve.html
 tests/solutions/
 tests/*.json
 *.md
+src/guides.js

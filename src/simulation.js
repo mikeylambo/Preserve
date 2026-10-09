@@ -45,7 +45,7 @@ export class DeathMaterials {
             x,
             y,
             base: y,
-            top: room.machine === "breaker" ? y - 16 : (room.liftTop ?? y - 6),
+            top: room.machine === "breaker" ? y - (room.liftRise ?? 16) : (room.liftTop ?? y - 6),
             required: room.machine === "breaker" ? this.lifts.length + 1 : 1,
             w: 3,
             h: 0.35,
@@ -73,6 +73,9 @@ export class DeathMaterials {
         }
       }
     if (!this.spawn || !this.exit) throw Error(`Missing entry/exit: ${room.id}`);
+    // Breaker lifts light the shaft from below: the lowest needs one strand, the next two...
+    if (room.machine === "breaker")
+      [...this.lifts].sort((a, b) => b.base - a.base).forEach((l, i) => (l.required = i + 1));
     if (room.machine === "separator") {
       for (let y = 0; y < this.h; y++)
         for (let x = 0; x < this.w; x++) if (this.grid[y][x] === "|") this.grid[y][x] = ".";
@@ -130,7 +133,7 @@ export class DeathMaterials {
       }
     for (const r of this.lifts) if (overlap(a, r)) return { cx: r.x, cy: r.y, ...r, c: "L" };
     if (this.room.machine === "impact") {
-      const y = Math.min(12, Math.floor(this.time / 8));
+      const y = this.plateRow();
       if (a.y < y + 1) return { cx: Math.floor(x), cy: y, x: Math.floor(x), y, w: 1, h: 1, c: "#" };
     }
     return null;
@@ -603,6 +606,7 @@ export class DeathMaterials {
       return this.die(p, hazard.c === "|" ? "cutter" : hazard.c, hazard.x, hazard.y);
     }
     if (fallHit) return this.die(p, "fall");
+    if (this.room.machine === "impact" && p.y < this.plateRow() + 1) return this.die(p, "crush");
     if (p.y > this.h + 1) return this.die(p, "void");
     const cx = Math.floor(p.x + p.w / 2),
       cy = Math.floor(p.y + p.h / 2);
@@ -617,11 +621,22 @@ export class DeathMaterials {
       this.emit("jar.enter");
     }
   }
+  // The impact plate's lowest solid row: it drops one row every plateEvery seconds.
+  plateRow() {
+    const { plateStop = 12, plateEvery = 8 } = this.room;
+    return Math.min(plateStop, Math.floor(this.time / plateEvery));
+  }
+  // Separator blades: each [x, top, length] stands upright, then turns flat about its middle.
   cutterRects() {
     if (this.room.machine !== "separator") return [];
     const horizontal = Math.floor(this.time / 5) % 2 === 1;
-    return [22, 50, 78].map((x) =>
-      horizontal ? { x: x - 2, y: 14, w: 4, h: 0.08 } : { x, y: 12, w: 0.08, h: 4 },
+    const blades = this.room.blades ?? [
+      [22, 12, 4],
+      [50, 12, 4],
+      [78, 12, 4],
+    ];
+    return blades.map(([x, y, n]) =>
+      horizontal ? { x: x - n / 2, y: y + n / 2, w: n, h: 0.08 } : { x, y, w: 0.08, h: n },
     );
   }
   state() {
