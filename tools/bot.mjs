@@ -261,6 +261,19 @@ function toward(x, y) {
   };
 }
 
+// Without a cell, steer toward the first live hazard of the asked kind.
+function guess(w, target) {
+  if (target.kind === "press") {
+    const k = w.presses.find((k) => !k.jammed);
+    if (k) return toward(k.x, k.floor - 1);
+  }
+  const ch = { "^": "^", f: "f", v: "v", w: "w", frost: "*" }[target.kind];
+  if (!ch) return undefined;
+  for (let y = 0; y < w.h; y++)
+    for (let x = 0; x < w.w; x++) if (w.grid[y][x] === ch) return toward(x, y);
+  return undefined;
+}
+
 // Follow room.solution: a list of death targets, then the exit.
 export function prove(room, opts = {}) {
   let w = new DeathMaterials(room);
@@ -304,7 +317,7 @@ export function prove(room, opts = {}) {
     const r = explore(w, {
       ...opts,
       prevHeld: held,
-      heuristic: target.at ? toward(...target.at) : undefined,
+      heuristic: target.at ? toward(...target.at) : guess(w, target),
       goal: (x) => x.deaths === deaths + 1 && matches(x, before, target),
     });
     if (!r)

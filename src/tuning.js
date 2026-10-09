@@ -17,6 +17,7 @@ export const TUNE = Object.freeze({
   respawn: 0.55,
   fall: 7,
   pad: 21,
+  belt: 3,
   frost: 0.45,
   iceMelt: 1.5,
   short: 1,

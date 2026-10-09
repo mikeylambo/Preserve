@@ -19,7 +19,11 @@ for (const room of rooms) {
   if (!flags.has("--quiet"))
     console.log(`\n${room.id} ${room.name} (par ${room.par})\n${room.rows.join("\n")}`);
   const t = Date.now();
-  const r = prove(room, { maxNodes: 400000 });
+  let r;
+  for (const maxNodes of [400000, 1500000, 5000000]) {
+    r = prove(room, { maxNodes });
+    if (r.ok) break;
+  }
   const target = room.par;
   let line = `${room.id}: `;
   if (!r.ok) {
@@ -34,7 +38,11 @@ for (const room of rooms) {
     await writeFile(`tests/par/${room.id}.json`, JSON.stringify(r.tape) + "\n");
   }
   if (r.ok && room.birdieSolution) {
-    const b = prove({ ...room, solution: room.birdieSolution }, { maxNodes: 400000 });
+    let b;
+    for (const maxNodes of [400000, 1500000, 5000000]) {
+      b = prove({ ...room, solution: room.birdieSolution }, { maxNodes });
+      if (b.ok) break;
+    }
     line += b.ok && b.tape.deaths === target - 1 ? `, birdie ${target - 1} ok` : ", BIRDIE FAIL";
     if (!(b.ok && b.tape.deaths === target - 1)) failed++;
   }

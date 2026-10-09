@@ -468,12 +468,13 @@ export class DeathMaterials {
     const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
     if (dir) p.face = dir;
     const below = this.cell(Math.floor(p.x + p.w / 2), Math.floor(p.y + p.h + 0.02));
-    const target = dir * (p.half ? T.halfRun : T.run),
+    // Belts move the surface: standing still on one carries Pip at belt speed.
+    const belt =
+      p.ground && (below === ">" || below === "<") ? (below === ">" ? 1 : -1) * T.belt : 0;
+    const target = dir * (p.half ? T.halfRun : T.run) + belt,
       acc = p.ground ? (dir ? T.acceleration : below === "s" ? 8 : T.friction) : T.air;
     if (p.vx < target) p.vx = Math.min(target, p.vx + acc * dt);
     else if (p.vx > target) p.vx = Math.max(target, p.vx - acc * dt);
-    if (p.ground && "< >".includes(below) && below !== " ")
-      p.vx += (below === ">" ? 1 : -1) * 2 * dt;
     if (this.room.wind) {
       const targetWind =
         this.time % 3 < 1.5 ? (p.half ? 3.5 : 2.5) * (this.room.windDirection ?? 1) : 0;
