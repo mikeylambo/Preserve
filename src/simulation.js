@@ -272,6 +272,11 @@ export class DeathMaterials {
           this.grid[ny][cx] = "i";
           this.emit("ice.launch", { x: cx, y: ny });
         }
+        // Ice freezes the water around it into a slick crust, so a strand beside it stays dry.
+        const [ix, iy] = this.materials.at(-1).cells[0];
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dx = -1; dx <= 1; dx++)
+            if (this.cell(ix + dx, iy + dy) === "~") this.grid[iy + dy][ix + dx] = "s";
       }
     } else if (kind === "fall") {
       const cy = Math.max(0, Math.floor(p.y + p.h - 0.001));
@@ -296,8 +301,9 @@ export class DeathMaterials {
     b.face = 1;
     a.cutterGrace = b.cutterGrace = 0.4;
     a.apex = b.apex = p.apex;
-    a.vx = p.vx;
-    b.vx = p.vx;
+    // The cut knocks the halves apart so neither is carried back through the blade.
+    a.vx = Math.min(p.vx, 0) - 3;
+    b.vx = Math.max(p.vx, 0) + 3;
     this.players = [a, b];
     this.active = 1;
     this.emit("jam.split", { x, y });

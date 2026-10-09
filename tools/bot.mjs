@@ -233,6 +233,10 @@ function matches(w, before, target) {
     );
     if (!formed && !(Math.floor(mark.x) === x && Math.floor(mark.y) === y)) return false;
   }
+  if (target.half !== undefined) {
+    const formed = w.materials.filter((m) => !before.has(m.id));
+    if (!formed.length || formed.some((m) => !!m.half !== target.half)) return false;
+  }
   return true;
 }
 
@@ -248,16 +252,19 @@ function tapeOf(room, world, inputs) {
   };
 }
 
-function toward(x, y) {
+// Distance to (x, y): the nearest body, or with `all` every living body (halves
+// must all get there, and merging into one counts as getting closer).
+function toward(x, y, all = false) {
   return (w) => {
-    let best = Infinity;
+    let best = Infinity,
+      sum = 0;
     for (const p of w.players)
-      if (!p.dead && !p.inJar)
-        best = Math.min(
-          best,
-          Math.abs(p.x + p.w / 2 - x - 0.5) + Math.abs(p.y + p.h / 2 - y - 0.5),
-        );
-    return best === Infinity ? 0 : best;
+      if (!p.dead && !p.inJar) {
+        const d = Math.abs(p.x + p.w / 2 - x - 0.5) + Math.abs(p.y + p.h / 2 - y - 0.5);
+        best = Math.min(best, d);
+        sum += d;
+      }
+    return best === Infinity ? 0 : all ? sum : best;
   };
 }
 
@@ -288,9 +295,10 @@ export function prove(room, opts = {}) {
       const r = explore(w, {
         ...opts,
         prevHeld: held,
-        heuristic: toward(vx, vy),
+        heuristic: toward(vx, vy, !!target.whole),
         goal: (x) =>
           x.deaths === deaths &&
+          (!target.whole || x.players.filter((p) => !p.dead).every((p) => !p.half)) &&
           x.players.some(
             (p) =>
               !p.dead &&
@@ -331,7 +339,7 @@ export function prove(room, opts = {}) {
   const r = explore(w, {
     ...opts,
     prevHeld: held,
-    heuristic: toward(w.exit.x, w.exit.y),
+    heuristic: toward(w.exit.x, w.exit.y, true),
     goal: (x) => x.won && x.deaths === deaths,
   });
   if (!r)
