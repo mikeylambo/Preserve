@@ -16,6 +16,10 @@ const GEL = 0x2bc4a8,
   HEAT = 0xff6a1a,
   ARC = 0xfff7a8,
   FROST = 0xeaf6ff;
+// The prototype's Pip is a 0.5 sphere; this fits it to the 0.76 tile body, and
+// lifts the pressed base (0.095 below its origin) onto the floor.
+const PIP_SCALE = 0.86,
+  PIP_BASE = 0.095 * PIP_SCALE;
 const FOV = 12;
 const TAN = Math.tan(THREE.MathUtils.degToRad(FOV / 2));
 const DEPTH = 1.6; // play-plane slab depth; the front face sits at z = DEPTH / 2
@@ -290,44 +294,42 @@ export class PreserveRenderer {
     return t;
   }
   createGel() {
-    const points = [new THREE.Vector2(0, 0)];
-    for (let i = 0; i <= 24; i++) {
-      const a = ((i / 24) * Math.PI) / 2;
-      // A flat, wide base rising to a rounded dome.
-      points.push(new THREE.Vector2(0.42 * Math.cos(a) ** 0.8, 0.76 * Math.sin(a)));
-    }
-    this.gelGeo = new THREE.LatheGeometry(points, 32);
-    // Medium tier: fresnel gel with a fake inner core and a specular glint.
+    // Pip is the gel-test prototype's Pip: a 0.5 sphere pressed into a flat, wide
+    // base, deformed every frame (wobble, squash, lean), with a glowing core.
+    this.gelBase = new THREE.SphereGeometry(0.5, 48, 32);
+    this.gelGeo = this.gelBase.clone();
+    this.deformGel(this.gelGeo, 0, 0, 0, 1);
+    // Medium tier: the prototype's fresnel gel, translucent with a lit core.
     this.gel = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: true,
       uniforms: {
-        time: this.uniforms.time,
-        tint: { value: new THREE.Color(GEL) },
-        glow: { value: new THREE.Color(GLOW) },
+        uColor: { value: new THREE.Color(GEL) },
+        uGlow: { value: new THREE.Color(GLOW) },
       },
-      vertexShader: `varying vec3 vN;varying vec3 vP;varying float vH;uniform float time;void main(){vec3 p=position;p.x+=sin(time*3.0+p.y*7.0)*.01*p.y;vH=position.y;vec4 wp=modelMatrix*vec4(p,1.0);vP=wp.xyz;vN=normalize(mat3(modelMatrix)*normal);gl_Position=projectionMatrix*viewMatrix*wp;}`,
-      fragmentShader: `varying vec3 vN;varying vec3 vP;varying float vH;uniform vec3 tint;uniform vec3 glow;void main(){vec3 n=normalize(vN),v=normalize(cameraPosition-vP);float ndv=max(dot(n,v),0.);float rim=pow(1.0-ndv,2.2);float spec=pow(max(dot(reflect(-normalize(vec3(-.5,1.,1.6)),n),v),0.),48.);float core=pow(ndv,2.5)*smoothstep(.0,.35,vH);vec3 col=tint*.28+tint*core*.9+glow*rim*.9+vec3(.9,1.,.97)*spec*.9;gl_FragColor=vec4(col,1.0);
+      vertexShader: `varying vec3 vN;varying vec3 vV;varying vec3 vP;void main(){vec4 mv=modelViewMatrix*vec4(position,1.);vN=normalize(normalMatrix*normal);vV=normalize(-mv.xyz);vP=position;gl_Position=projectionMatrix*mv;}`,
+      fragmentShader: `uniform vec3 uColor;uniform vec3 uGlow;varying vec3 vN;varying vec3 vV;varying vec3 vP;void main(){vec3 n=normalize(vN),v=normalize(vV);float f=pow(clamp(1.-dot(n,v),0.,1.),2.2);float core=smoothstep(.9,.0,length(vP*vec3(1.,1.3,1.)));vec3 c=mix(uColor*.55,uGlow,core*.9)+uGlow*f*1.2;float spec=pow(clamp(dot(reflect(-normalize(vec3(-.4,.8,.5)),n),v),0.,1.),40.);gl_FragColor=vec4(c+spec*.9,clamp(.78+f*.2,0.,1.));
       #include <tonemapping_fragment>
       #include <colorspace_fragment>
       }`,
     });
-    // High tier: physical transmission gel.
+    // High tier: the prototype's physical transmission gel.
     this.highGel = new THREE.MeshPhysicalMaterial({
       color: GEL,
-      transmission: 0.82,
-      thickness: 0.55,
-      ior: 1.35,
-      roughness: 0.12,
+      roughness: 0.08,
+      metalness: 0,
+      transmission: 0.92,
+      thickness: 1.2,
+      ior: 1.38,
+      attenuationColor: new THREE.Color(GEL),
+      attenuationDistance: 2.2,
       clearcoat: 1,
-      clearcoatRoughness: 0.08,
+      clearcoatRoughness: 0.05,
       emissive: DEEP,
-      emissiveIntensity: 0.55,
+      emissiveIntensity: 0.7,
     });
     // Low tier: unlit translucent gel.
-    this.lowGel = new THREE.MeshBasicMaterial({
-      color: 0x3ed6b8,
-      transparent: true,
-      opacity: 0.86,
-    });
+    this.lowGel = new THREE.MeshBasicMaterial({ color: GEL, transparent: true, opacity: 0.9 });
     this.ghostGel = new THREE.MeshBasicMaterial({
       color: 0x8affdf,
       transparent: true,
@@ -359,37 +361,58 @@ export class PreserveRenderer {
           : this.gel;
     return material;
   }
-  // Pip: a dome with a flat base and two seed-eyes on the front. Nothing inside.
+  // The prototype's body deform: flat wide base, a slow wobble, squash and
+  // stretch, a breath, and a lean into the run.
+  deformGel(geo, t, sq, run, face) {
+    const base = this.gelBase.attributes.position.array,
+      pos = geo.attributes.position,
+      arr = pos.array;
+    for (let i = 0; i < arr.length; i += 3) {
+      let x = base[i],
+        y = base[i + 1],
+        z = base[i + 2];
+      if (y < -0.12) y = -0.12 + (y + 0.12) * 0.25;
+      const r = 1 + Math.sin(t * 3.1 + y * 6 + x * 3) * 0.018 + Math.sin(t * 1.7 + z * 5) * 0.012;
+      x *= r * (1 + sq * 0.35) * (1 + 0.06 * run);
+      z *= r * (1 + sq * 0.35);
+      y = (y + 0.12) * r * (1 - sq * 0.3) * (1 + 0.05 * Math.sin(t * 2));
+      x += y * 0.25 * run * face;
+      arr[i] = x;
+      arr[i + 1] = y;
+      arr[i + 2] = z;
+    }
+    pos.needsUpdate = true;
+    geo.computeVertexNormals();
+  }
+  // Pip: the prototype gel body, a glowing core and two seed-eyes.
   pip(ghost = false) {
     const g = new THREE.Group();
-    const body = new THREE.Mesh(this.gelGeo, ghost ? this.ghostGel : this.pipBody());
+    const inner = new THREE.Group();
+    inner.scale.setScalar(PIP_SCALE);
+    inner.position.y = PIP_BASE;
+    g.add(inner);
+    const geo = ghost ? this.gelGeo : this.gelBase.clone();
+    const body = new THREE.Mesh(geo, ghost ? this.ghostGel : this.pipBody());
     body.castShadow = !ghost;
-    g.add(body);
+    inner.add(body);
     g.userData.body = body;
     if (!ghost) {
-      const eyeMat = this.mat("eye", () => new THREE.MeshBasicMaterial({ color: EYE }));
-      g.userData.eyes = [-1, 1].map((s) => {
+      const core = new THREE.Mesh(
+        this.geos.sphere,
+        this.mat("pipCore", () => new THREE.MeshBasicMaterial({ color: GLOW })),
+      );
+      core.scale.setScalar(0.2);
+      inner.add(core);
+      const eyeMat = this.mat(
+        "eye",
+        () => new THREE.MeshStandardMaterial({ color: EYE, roughness: 0.4 }),
+      );
+      g.userData.eyes = [-1, 1].map(() => {
         const eye = new THREE.Mesh(this.geos.sphere, eyeMat);
-        eye.position.set(s * 0.12, 0.42, 0.33);
-        eye.scale.set(0.042, 0.068, 0.03);
-        g.add(eye);
+        inner.add(eye);
         return eye;
       });
-      const glint = new THREE.Mesh(
-        this.geos.sphere,
-        this.mat(
-          "glint",
-          () => new THREE.MeshBasicMaterial({ color: 0xd6fff4, transparent: true, opacity: 0.6 }),
-        ),
-      );
-      glint.position.set(-0.15, 0.58, 0.25);
-      glint.scale.set(0.05, 0.085, 0.015);
-      g.add(glint);
-      const halo = new THREE.Sprite(this.haloMat);
-      halo.position.set(0, 0.3, -0.4);
-      halo.scale.set(1.7, 1.7, 1);
-      g.add(halo);
-      g.userData.halo = halo;
+      g.userData.core = core;
       g.userData.blink = 0;
       g.userData.glance = 0;
     }
@@ -404,7 +427,8 @@ export class PreserveRenderer {
         if (
           o.geometry &&
           !Object.values(this.geos).includes(o.geometry) &&
-          o.geometry !== this.gelGeo
+          o.geometry !== this.gelGeo &&
+          o.geometry !== this.gelBase
         )
           o.geometry.dispose();
       });
@@ -1115,8 +1139,21 @@ export class PreserveRenderer {
             0.07,
           );
         }
-        if (c === "|")
-          B.add(this.geos.box, this.std("blade", BONE, 0.3, 0.5), cx, y + 0.5, 0.2, 0.06, 1, 0.9);
+        if (c === "|") {
+          // A bright bone edge held by dark clamps, so the blade reads at a glance.
+          B.add(this.geos.box, this.glow("bladeEdge", BONE), cx, y + 0.5, 0.2, 0.08, 1, 0.9);
+          for (const end of [0.06, 0.94])
+            B.add(
+              this.geos.box,
+              this.std("clamp", 0x23272c, 0.6, 0.6),
+              cx,
+              y + end,
+              0.2,
+              0.3,
+              0.12,
+              1,
+            );
+        }
         if (c === "s")
           B.add(
             this.geos.chamfer,
@@ -1485,31 +1522,27 @@ export class PreserveRenderer {
       const q = w.players[i];
       mesh.visible = !!q && !q.dead && !q.inJar;
       if (!mesh.visible) return;
-      mesh.userData.body.material = bodyMat;
-      mesh.userData.halo.visible = this.settings.pip !== "low";
-      mesh.position.set(q.x + q.w / 2, -q.y - q.h, 0);
-      const size = q.half ? 0.62 : 1;
-      const motion = this.settings.motion !== false;
-      const sq = motion ? q.sq : 0;
-      const breathe =
-        motion && q.ground && Math.abs(q.vx) < 0.5 ? Math.sin(this.clock * 2.2 + i) * 0.025 : 0;
-      const run = motion && q.ground ? Math.min(Math.abs(q.vx) / 6.5, 1) * 0.08 : 0;
-      // Halves are smaller and rounder.
-      mesh.scale.set(
-        size * (1 + sq * 0.35 + run) * (q.half ? 1.12 : 1),
-        size * (1 - sq * 0.3 + breathe - run * 0.5) * (q.half ? 0.92 : 1),
-        size,
-      );
-      mesh.rotation.z = motion ? -q.vx * 0.018 : 0;
-      // Seed-eyes track the facing direction, blink and glance around.
       const u = mesh.userData;
+      u.body.material = bodyMat;
+      u.core.visible = this.settings.pip !== "low";
+      mesh.position.set(q.x + q.w / 2, -q.y - q.h, 0);
+      const motion = this.settings.motion !== false;
+      const t = motion ? this.clock + i * 1.7 : 0;
+      const sq = motion ? q.sq : 0;
+      const run = motion ? Math.min(1, Math.abs(q.vx) / 6.5) : 0;
+      this.deformGel(u.body.geometry, t, sq, run, q.face);
+      // Halves are smaller and rounder.
+      const size = q.half ? 0.62 : 1;
+      mesh.scale.set(size * (q.half ? 1.08 : 1), size * (q.half ? 0.94 : 1), size);
+      u.core.position.set(0, 0.22 * (1 - sq * 0.3), 0);
+      u.core.scale.setScalar(0.2 * (1 + Math.sin(t * 2) * 0.06));
+      // Seed-eyes look where Pip faces, blink and now and then glance.
       u.blink -= dt;
       if (u.blink < -3 - hash(i, Math.floor(this.clock)) * 2) u.blink = 0.12;
       u.glance = Math.sin(this.clock * 0.7 + i * 2) > 0.92 ? 0.04 : 0;
       u.eyes.forEach((eye, k) => {
-        eye.position.x = (k ? 0.12 : -0.12) + q.face * 0.05 + u.glance;
-        eye.position.y = 0.42 + (q.vy > 4 ? -0.03 : q.vy < -4 ? 0.03 : 0);
-        eye.scale.y = u.blink > 0 ? 0.008 : 0.068;
+        eye.position.set((k ? 0.12 : -0.12) + q.face * 0.08 + u.glance, 0.27 * (1 - sq * 0.3), 0.5);
+        eye.scale.set(0.055, 0.055 * 1.6 * (u.blink > 0 ? 0.15 : 1), 0.055 * 0.6);
       });
     });
     this.pipLight.position.set(px, -py + 0.3, 1.6);
